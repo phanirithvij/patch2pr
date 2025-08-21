@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -146,7 +147,7 @@ func main() {
 
 type Patch struct {
 	path   string
-	files  []*gitdiff.File
+	files  []*patch2pr.File
 	header *gitdiff.PatchHeader
 }
 
@@ -161,8 +162,16 @@ type PullRequestResult struct {
 	URL    string `json:"url"`
 }
 
+type readCloser struct {
+	io.Reader
+	io.Closer
+}
+
+func (r readCloser) Close() error { return nil }
+
 func parse(patchFile string) ([]Patch, error) {
 	var r io.ReadCloser
+	var b bytes.Buffer
 	if patchFile == "-" {
 		r = os.Stdin
 	} else {
@@ -170,7 +179,8 @@ func parse(patchFile string) ([]Patch, error) {
 		if err != nil {
 			return nil, fmt.Errorf("open patch file failed: %w", err)
 		}
-		r = f
+		tee := io.TeeReader(f, &b)
+		r = readCloser{tee, r}
 	}
 	defer closeQuitely(r)
 
@@ -178,9 +188,13 @@ func parse(patchFile string) ([]Patch, error) {
 
 	var patches []Patch
 	for mbr.Next() {
-		files, preamble, err := gitdiff.Parse(&mbr)
+		files := []*patch2pr.File{}
+		files_, preamble, err := gitdiff.Parse(&mbr)
 		if err != nil {
 			return nil, fmt.Errorf("parsing patch failed: %w", err)
+		}
+		for _, file := range files_ {
+			files = append(files, &patch2pr.File{File: *file})
 		}
 
 		var header *gitdiff.PatchHeader
@@ -192,6 +206,15 @@ func parse(patchFile string) ([]Patch, error) {
 		}
 
 		patches = append(patches, Patch{patchFile, files, header})
+	}
+
+	// each file remembers the full git patch content
+	nb := make([]byte, b.Len())
+	copy(nb, b.Bytes())
+	for _, p := range patches {
+		for _, f := range p.files {
+			f.FullPatchText = nb
+		}
 	}
 	return patches, nil
 }

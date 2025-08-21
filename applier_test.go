@@ -84,7 +84,8 @@ func runPatchTest(t *testing.T, tctx *TestContext, name string) {
 
 	applier := NewApplier(tctx.Client, tctx.Repo, tctx.BaseCommit)
 	for _, file := range files {
-		if _, err := applier.Apply(tctx, file); err != nil {
+		f := &File{File: *file}
+		if _, err := applier.Apply(tctx, f); err != nil {
 			t.Fatalf("error applying file patch: %s: %v", file.NewName, err)
 		}
 	}

@@ -48,7 +48,7 @@ func NewApplier(client *github.Client, repo Repository, c *github.Commit) *Appli
 // Apply applies the changes in a file, adds the result to the list of pending
 // tree entries, and returns the entry. If the application succeeds, Apply
 // creates a blob in the repository with the modified content.
-func (a *Applier) Apply(ctx context.Context, f *gitdiff.File) (*github.TreeEntry, error) {
+func (a *Applier) Apply(ctx context.Context, f *File) (*github.TreeEntry, error) {
 	// TODO(bkeyes): validate file to make sure fields are consistent
 	// maybe two modes: validate and fix, where fix tries to set
 	// missing fields based on the framents or the set fields
@@ -85,7 +85,7 @@ func (a *Applier) Apply(ctx context.Context, f *gitdiff.File) (*github.TreeEntry
 	return entry, nil
 }
 
-func (a *Applier) applyCreate(ctx context.Context, f *gitdiff.File) (*github.TreeEntry, error) {
+func (a *Applier) applyCreate(ctx context.Context, f *File) (*github.TreeEntry, error) {
 	_, exists, err := a.getEntry(ctx, f.NewName)
 	if err != nil {
 		return nil, err
@@ -111,7 +111,7 @@ func (a *Applier) applyCreate(ctx context.Context, f *gitdiff.File) (*github.Tre
 	return newEntry, nil
 }
 
-func (a *Applier) applyDelete(ctx context.Context, f *gitdiff.File) (*github.TreeEntry, error) {
+func (a *Applier) applyDelete(ctx context.Context, f *File) (*github.TreeEntry, error) {
 	entry, exists, err := a.getEntry(ctx, f.OldName)
 	if err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func (a *Applier) applyDelete(ctx context.Context, f *gitdiff.File) (*github.Tre
 		return nil, fmt.Errorf("get blob content failed: %w", err)
 	}
 
-	if err := gitdiff.Apply(io.Discard, bytes.NewReader(data), f); err != nil {
+	if err := gitdiff.Apply(io.Discard, bytes.NewReader(data), &f.File); err != nil {
 		return nil, err
 	}
 
@@ -141,7 +141,7 @@ func (a *Applier) applyDelete(ctx context.Context, f *gitdiff.File) (*github.Tre
 	return newEntry, nil
 }
 
-func (a *Applier) applyModify(ctx context.Context, f *gitdiff.File) (*github.TreeEntry, error) {
+func (a *Applier) applyModify(ctx context.Context, f *File) (*github.TreeEntry, error) {
 	entry, exists, err := a.getEntry(ctx, f.OldName)
 	if err != nil {
 		return nil, err
@@ -165,7 +165,12 @@ func (a *Applier) applyModify(ctx context.Context, f *gitdiff.File) (*github.Tre
 
 		c, err := base64Apply(data, f)
 		if err != nil {
-			return nil, err
+			if _, ok := err.(*gitdiff.ApplyError); !ok {
+				return nil, err
+			}
+			if c, err = base64GitApply(data, f); err != nil {
+				return nil, err
+			}
 		}
 		newEntry.Content = &c
 	}
@@ -341,11 +346,11 @@ func findTreeEntry(t *github.Tree, name, entryType string) (*github.TreeEntry, b
 	return nil, false
 }
 
-func base64Apply(data []byte, f *gitdiff.File) (string, error) {
+func base64Apply(data []byte, f *File) (string, error) {
 	var b bytes.Buffer
 
 	enc := base64.NewEncoder(base64.StdEncoding, &b)
-	if err := gitdiff.Apply(enc, bytes.NewReader(data), f); err != nil {
+	if err := gitdiff.Apply(enc, bytes.NewReader(data), &f.File); err != nil {
 		return "", err
 	}
 	if err := enc.Close(); err != nil {
@@ -356,7 +361,7 @@ func base64Apply(data []byte, f *gitdiff.File) (string, error) {
 }
 
 // TODO(bkeyes): extract this to go-gitdiff in some form?
-func getMode(f *gitdiff.File, existing *github.TreeEntry) string {
+func getMode(f *File, existing *github.TreeEntry) string {
 	switch {
 	case f.NewMode > 0:
 		return strconv.FormatInt(int64(f.NewMode), 8)

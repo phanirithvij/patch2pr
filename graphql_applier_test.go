@@ -57,7 +57,8 @@ func runGraphQLPatchTest(t *testing.T, tctx *TestContext, name string) {
 
 	unsupported := false
 	for _, file := range files {
-		if err := applier.Apply(tctx, file); err != nil {
+		f := &File{File: *file}
+		if err := applier.Apply(tctx, f); err != nil {
 			if GraphQLUnsupportedPatches[name] && IsUnsupported(err) {
 				unsupported = true
 				continue

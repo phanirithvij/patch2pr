@@ -81,7 +81,7 @@ func (a *GraphQLApplier) SetV3Client(client *github.Client) {
 // When given an unsupported patch, Apply returns an error such that
 // IsUnsupported(err) is true. Setting a V3 client with SetV3Client allows
 // Apply to process some patches that are otherwise unsupported.
-func (a *GraphQLApplier) Apply(ctx context.Context, f *gitdiff.File) error {
+func (a *GraphQLApplier) Apply(ctx context.Context, f *File) error {
 	// As of 2021-09-22, createCommitOnBranch handles file modes
 	// inconsistently:
 	//
@@ -116,7 +116,7 @@ func (a *GraphQLApplier) Apply(ctx context.Context, f *gitdiff.File) error {
 	}
 }
 
-func (a *GraphQLApplier) applyCreate(ctx context.Context, f *gitdiff.File) error {
+func (a *GraphQLApplier) applyCreate(ctx context.Context, f *File) error {
 	_, exists, err := a.getContent(ctx, f.NewName)
 	if err != nil {
 		return err
@@ -126,7 +126,7 @@ func (a *GraphQLApplier) applyCreate(ctx context.Context, f *gitdiff.File) error
 	}
 
 	var b bytes.Buffer
-	if err := gitdiff.Apply(&b, bytes.NewReader(nil), f); err != nil {
+	if err := gitdiff.Apply(&b, bytes.NewReader(nil), &f.File); err != nil {
 		return err
 	}
 
@@ -135,7 +135,7 @@ func (a *GraphQLApplier) applyCreate(ctx context.Context, f *gitdiff.File) error
 	return nil
 }
 
-func (a *GraphQLApplier) applyDelete(ctx context.Context, f *gitdiff.File) error {
+func (a *GraphQLApplier) applyDelete(ctx context.Context, f *File) error {
 	data, exists, err := a.getContent(ctx, f.OldName)
 	if err != nil {
 		return err
@@ -146,7 +146,7 @@ func (a *GraphQLApplier) applyDelete(ctx context.Context, f *gitdiff.File) error
 		return errors.New("missing entry for deleted file")
 	}
 
-	if err := gitdiff.Apply(io.Discard, bytes.NewReader(data), f); err != nil {
+	if err := gitdiff.Apply(io.Discard, bytes.NewReader(data), &f.File); err != nil {
 		return err
 	}
 
@@ -154,7 +154,7 @@ func (a *GraphQLApplier) applyDelete(ctx context.Context, f *gitdiff.File) error
 	return nil
 }
 
-func (a *GraphQLApplier) applyModify(ctx context.Context, f *gitdiff.File) error {
+func (a *GraphQLApplier) applyModify(ctx context.Context, f *File) error {
 	data, exists, err := a.getContent(ctx, f.OldName)
 	if err != nil {
 		return err
@@ -165,8 +165,16 @@ func (a *GraphQLApplier) applyModify(ctx context.Context, f *gitdiff.File) error
 
 	if len(f.TextFragments) > 0 || f.BinaryFragment != nil {
 		var b bytes.Buffer
-		if err := gitdiff.Apply(&b, bytes.NewReader(data), f); err != nil {
-			return err
+		err = gitdiff.Apply(&b, bytes.NewReader(data), &f.File)
+		if err != nil {
+			if _, ok := err.(*gitdiff.ApplyError); !ok {
+				return err
+			}
+			var c string
+			if c, err = gitApply(data, f); err != nil {
+				return err
+			}
+			b.Write([]byte(c))
 		}
 		data = b.Bytes()
 	}
@@ -366,7 +374,7 @@ func isModeChange(m1, m2 os.FileMode) bool {
 	return m1 != 0 && m2 != 0 && m1 != m2
 }
 
-func isRename(f *gitdiff.File) bool {
+func isRename(f *File) bool {
 	if f.IsRename {
 		return true
 	}
