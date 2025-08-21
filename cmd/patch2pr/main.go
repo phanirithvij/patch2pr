@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -66,7 +65,7 @@ func main() {
 	}
 
 	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-	fs.SetOutput(ioutil.Discard)
+	fs.SetOutput(io.Discard)
 	fs.Usage = func() {}
 
 	fs.StringVar(&opts.BaseBranch, "base-branch", "", "base-branch")

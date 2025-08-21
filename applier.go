@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -127,7 +127,7 @@ func (a *Applier) applyDelete(ctx context.Context, f *gitdiff.File) (*github.Tre
 		return nil, fmt.Errorf("get blob content failed: %w", err)
 	}
 
-	if err := gitdiff.Apply(ioutil.Discard, bytes.NewReader(data), f); err != nil {
+	if err := gitdiff.Apply(io.Discard, bytes.NewReader(data), f); err != nil {
 		return nil, err
 	}
 
