@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path"
 
@@ -146,7 +146,7 @@ func (a *GraphQLApplier) applyDelete(ctx context.Context, f *gitdiff.File) error
 		return errors.New("missing entry for deleted file")
 	}
 
-	if err := gitdiff.Apply(ioutil.Discard, bytes.NewReader(data), f); err != nil {
+	if err := gitdiff.Apply(io.Discard, bytes.NewReader(data), f); err != nil {
 		return err
 	}
 
