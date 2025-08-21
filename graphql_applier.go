@@ -165,8 +165,16 @@ func (a *GraphQLApplier) applyModify(ctx context.Context, f *gitdiff.File) error
 
 	if len(f.TextFragments) > 0 || f.BinaryFragment != nil {
 		var b bytes.Buffer
-		if err := gitdiff.Apply(&b, bytes.NewReader(data), f); err != nil {
-			return err
+		err = gitdiff.Apply(&b, bytes.NewReader(data), f)
+		if err != nil {
+			if _, ok := err.(*gitdiff.ApplyError); !ok {
+				return err
+			}
+			var c string
+			if c, err = gitApply(data, f); err != nil {
+				return err
+			}
+			b.Write([]byte(c))
 		}
 		data = b.Bytes()
 	}

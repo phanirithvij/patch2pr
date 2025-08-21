@@ -165,7 +165,12 @@ func (a *Applier) applyModify(ctx context.Context, f *gitdiff.File) (*github.Tre
 
 		c, err := base64Apply(data, f)
 		if err != nil {
-			return nil, err
+			if _, ok := err.(*gitdiff.ApplyError); !ok {
+				return nil, err
+			}
+			if c, err = base64GitApply(data, f); err != nil {
+				return nil, err
+			}
 		}
 		newEntry.Content = &c
 	}
