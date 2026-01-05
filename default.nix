@@ -12,7 +12,7 @@ buildGoModule (finalAttrs: {
   version = "0.38.0";
 
   src = lib.cleanSource ./.;
-  vendorHash = "sha256-QEgGq5/JQUIWWmJKoQ832eKhiF5xF8Jivpn1uFDERTA=";
+  vendorHash = "sha256-vzyv6yStG7KnMljF/B5mro37G7T0XGEh4UAtcRHNQFg=";
 
   ldflags = [
     "-X main.version=${finalAttrs.version}"

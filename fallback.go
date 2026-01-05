@@ -58,6 +58,7 @@ func gitApply(data []byte, f *gitdiff.File) (out string, err error) {
 
 	// only single file needs patching (parial patch)
 	// TODO it can occur multiple times in the patch, see if we handle that case correctly
+	// TODO --3way patch can't be done outside a git repo
 	cmd := exec.Command("git", "apply", patchFile, "--include="+f.OldName)
 	if _, err = cmd.Output(); err != nil {
 		return
